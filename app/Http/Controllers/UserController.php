@@ -51,6 +51,7 @@ class UserController extends Controller
             // Save the prediction in the database
             Prediction::create([
                 'user_id' => $user->id,
+                'prediction_result' => $prediction,
                 'prediction' => $prediction,
             ]);
 
