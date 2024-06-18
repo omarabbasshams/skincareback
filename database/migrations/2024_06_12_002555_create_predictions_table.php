@@ -13,6 +13,9 @@ return new class extends Migration
     {
         Schema::create('predictions', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->string('image_path');
+            $table->string('prediction_result');
             $table->timestamps();
         });
     }
