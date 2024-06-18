@@ -5,14 +5,17 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class Prediction extends Model
+class Product extends Model
 {
     use HasFactory;
 
     protected $fillable = [
-        'user_id',
+        'name',
+        'label',
+        'brand',
+        'price',
+        'rank',
+        'ingredients',
         'image_path',
-        'prediction_result',
-        // Add any other fields that you want to be mass assignable
     ];
 }

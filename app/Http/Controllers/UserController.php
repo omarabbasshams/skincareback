@@ -9,7 +9,7 @@ use GuzzleHttp\Client;
 use App\Models\Question;
 use App\Models\Answer;
 use App\Models\Prediction;
-use App\Models\Recommendation;
+use App\Models\Product;
 
 class UserController extends Controller
 {
@@ -46,16 +46,16 @@ class UserController extends Controller
             $path = $request->file('image')->store('images', 'public');
 
             // Call the ML model to get predictions
-            $prediction = $this->callMLModel($path);
+            $predictionResult = $this->callMLModel($path);
 
-            // Save the prediction in the database
-            Prediction::create([
+            // Save the prediction
+            $prediction = Prediction::create([
                 'user_id' => $user->id,
-                'prediction_result' => $prediction,
-                'prediction' => $prediction,
+                'image_path' => $path,
+                'prediction_result' => $predictionResult,
             ]);
 
-            return response()->json(['prediction' => $prediction]);
+            return response()->json(['prediction' => $predictionResult]);
         }
 
         return response()->json(['error' => 'Image not uploaded'], 400);
@@ -80,57 +80,40 @@ class UserController extends Controller
 
         // Decode the JSON response
         $data = json_decode($response->getBody()->getContents(), true);
-        $predictionIndex = $data['prediction'];
-
-        // Map the integer prediction to a string label
-        $labels = [
-            0 => 'acne',
-            1 => 'redness',
-            2 => 'bags',
-            3 => 'wrinkles',
-        ];
-
-        $predictionLabel = $labels[$predictionIndex] ?? 'unknown';
-
-        return $predictionLabel;
+        return $data['prediction'];
     }
 
-    public function getRecommendations()
+    public function getRecommendations(Request $request)
     {
         $user = Auth::user();
-        $recommendations = Recommendation::where('user_id', $user->id)->get();
-        return response()->json($recommendations);
-    }
-
-    public function generateRecommendations(Request $request)
-    {
-        $user = Auth::user();
+        $answers = Answer::where('user_id', $user->id)->pluck('answer', 'question_id')->toArray();
         $prediction = Prediction::where('user_id', $user->id)->latest()->first();
-        $answers = Answer::where('user_id', $user->id)->get()->pluck('answer', 'question_id')->toArray();
 
-        // Prepare the data for the Python service
-        $data = [
-            'prediction' => $prediction->prediction,
-            'answers' => $answers
-        ];
-
-        // Call the Python service to get recommendations
-        $client = new Client();
-        $response = $client->post('http://127.0.0.1:8000/recommend/', [
-            'json' => $data
-        ]);
-
-        // Decode the JSON response
-        $data = json_decode($response->getBody()->getContents(), true);
-        $recommendedProductIds = $data['recommendations'];
-
-        foreach ($recommendedProductIds as $productId) {
-            Recommendation::create([
-                'user_id' => $user->id,
-                'product_id' => $productId,
-            ]);
+        if (!$prediction) {
+            return response()->json(['error' => 'No prediction found'], 400);
         }
 
-        return response()->json(['message' => 'Recommendations generated successfully']);
+        // Call the recommendation service
+        $recommendations = $this->callRecommendationService($answers, $prediction->prediction_result);
+
+        // Get the product details from the Product table
+        $products = Product::whereIn('id', $recommendations)->get();
+
+        return response()->json(['recommendations' => $products]);
+    }
+
+    protected function callRecommendationService($answers, $predictionResult)
+    {
+        // Example using HTTP request to FastAPI service
+        $client = new Client();
+        $response = $client->post('http://127.0.0.1:8000/recommend/', [
+            'json' => [
+                'answers' => $answers,
+                'prediction' => $predictionResult
+            ]
+        ]);
+
+        $data = json_decode($response->getBody()->getContents(), true);
+        return $data['recommendations'];
     }
 }

@@ -10,7 +10,8 @@
         "laravel/framework": "^11.0",
         "laravel/passport": "^12.2",
         "laravel/sanctum": "^4.0",
-        "laravel/tinker": "^2.9"
+        "laravel/tinker": "^2.9",
+        "league/csv": "^9.16"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
