@@ -3,56 +3,43 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\Question;
+use Illuminate\Support\Facades\Auth;
+use App\Models\Admin;
 
-class AdminController extends Controller
+class AdminAuthController extends Controller
 {
-    public function dashboard()
+    // Show the admin login form
+    public function showLoginForm()
     {
-        return view('admin.dashboard');
+        return view('admin.login');
     }
 
-    public function index()
-    {
-        $questions = Question::all();
-        return view('admin.questions.index', compact('questions'));
-    }
-
-    public function create()
-    {
-        return view('admin.questions.create');
-    }
-
-    public function store(Request $request)
+    // Handle admin login
+    public function login(Request $request)
     {
         $request->validate([
-            'question' => 'required|string|max:255',
+            'email' => 'required|email',
+            'password' => 'required',
         ]);
 
-        Question::create($request->all());
+        $credentials = $request->only('email', 'password');
 
-        return redirect()->route('questions.index');
-    }
+        if (Auth::guard('admin')->attempt($credentials)) {
+            $admin = Auth::guard('admin')->user();
+            return redirect()->route('admin.dashboard');
+        }
 
-    public function edit(Question $question)
-    {
-        return view('admin.questions.edit', compact('question'));
-    }
-
-    public function update(Request $request, Question $question)
-    {
-        $request->validate([
-            'question' => 'required|string|max:255',
+        return back()->withErrors([
+            'email' => 'The provided credentials do not match our records.',
         ]);
-
-        $question->update($request->all());
-
-        return redirect()->route('questions.index');
     }
 
-    public function destroy(Question $question)
+    // Handle admin logout
+    public function logout(Request $request)
     {
-        $question->delete();
-        return redirect()->route('questions.index');
+        Auth::guard('admin')->logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+        return redirect()->route('admin.login');
     }
 }
