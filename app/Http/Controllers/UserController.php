@@ -82,7 +82,7 @@ class UserController extends Controller
         $data = json_decode($response->getBody()->getContents(), true);
         return $data['prediction'];
     }
-    public function getRecommendation(Request $request)
+    public function getRecommendations(Request $request)
     {
         $user = Auth::user();
         $answers = $request->input('answers');
