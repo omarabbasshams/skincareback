@@ -4,8 +4,8 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
-use GuzzleHttp\Client;
 use App\Models\Question;
 use App\Models\Answer;
 use App\Models\Prediction;
@@ -13,6 +13,14 @@ use App\Models\Recommendation;
 
 class UserController extends Controller
 {
+    // Map the integer predictions to issue names
+    private $labels = [
+        0 => 'acne',
+        1 => 'redness',
+        2 => 'bags',
+        3 => 'wrinkles',
+    ];
+
     public function getQuestions()
     {
         $questions = Question::all();
@@ -48,14 +56,17 @@ class UserController extends Controller
             // Call the ML model to get predictions
             $prediction = $this->callMLModel($path);
 
+            // Map integer prediction to issue
+            $prediction_result = $this->labels[$prediction];
+
             // Save the prediction in the database
             Prediction::create([
                 'user_id' => $user->id,
-                'prediction_result' => $prediction,
-                'prediction' => $prediction,
+                'prediction_result' => $prediction_result,
+                'image_path' => $path
             ]);
 
-            return response()->json(['prediction' => $prediction]);
+            return response()->json(['prediction' => $prediction_result]);
         }
 
         return response()->json(['error' => 'Image not uploaded'], 400);
@@ -67,70 +78,39 @@ class UserController extends Controller
         $image = Storage::disk('public')->get($imagePath);
 
         // Send the image to the Python service
-        $client = new Client();
-        $response = $client->post('http://127.0.0.1:8000/predict/', [
-            'multipart' => [
-                [
-                    'name' => 'file',
-                    'contents' => $image,
-                    'filename' => basename($imagePath)
-                ]
-            ]
-        ]);
+        $response = Http::attach('file', $image, basename($imagePath))
+                        ->post('http://127.0.0.1:8000/predict/');
 
         // Decode the JSON response
-        $data = json_decode($response->getBody()->getContents(), true);
-        $predictionIndex = $data['prediction'];
-
-        // Map the integer prediction to a string label
-        $labels = [
-            0 => 'acne',
-            1 => 'redness',
-            2 => 'bags',
-            3 => 'wrinkles',
-        ];
-
-        $predictionLabel = $labels[$predictionIndex] ?? 'unknown';
-
-        return $predictionLabel;
+        $data = $response->json();
+        return $data['prediction'];
     }
 
     public function getRecommendations()
     {
         $user = Auth::user();
-        $recommendations = Recommendation::where('user_id', $user->id)->get();
-        return response()->json($recommendations);
-    }
-
-    public function generateRecommendations(Request $request)
-    {
-        $user = Auth::user();
         $prediction = Prediction::where('user_id', $user->id)->latest()->first();
         $answers = Answer::where('user_id', $user->id)->get()->pluck('answer', 'question_id')->toArray();
 
-        // Prepare the data for the Python service
-        $data = [
-            'prediction' => $prediction->prediction,
-            'answers' => $answers
-        ];
+        if (!$prediction) {
+            return response()->json(['error' => 'No prediction found'], 400);
+        }
 
-        // Call the Python service to get recommendations
-        $client = new Client();
-        $response = $client->post('http://127.0.0.1:8000/recommend/', [
-            'json' => $data
+        $response = Http::post('http://127.0.0.1:8000/recommend/', [
+            'answers' => $answers,
+            'issue' => $prediction->prediction_result
         ]);
 
-        // Decode the JSON response
-        $data = json_decode($response->getBody()->getContents(), true);
-        $recommendedProductIds = $data['recommendations'];
+        $data = $response->json();
 
-        foreach ($recommendedProductIds as $productId) {
+        // Save recommendations in the database
+        foreach ($data['recommendations'] as $product_id) {
             Recommendation::create([
                 'user_id' => $user->id,
-                'product_id' => $productId,
+                'product_id' => $product_id,
             ]);
         }
 
-        return response()->json(['message' => 'Recommendations generated successfully']);
+        return response()->json($data);
     }
 }
