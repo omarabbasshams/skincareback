@@ -82,26 +82,24 @@ class UserController extends Controller
         $data = json_decode($response->getBody()->getContents(), true);
         return $data['prediction'];
     }
-    public function getRecommendations(Request $request)
+    public function getRecommendation(Request $request)
     {
         $user = Auth::user();
+        $answers = $request->input('answers');
+        $prediction = Prediction::where('user_id', $user->id)->latest()->first()->issue;
 
-        $answers = Answer::where('user_id', $user->id)->get();
-        $skin_type = $answers->where('question_id', 1)->first()->answer; // Assuming question_id 1 is for skin type
-
-        $prediction = Prediction::where('user_id', $user->id)->orderBy('created_at', 'desc')->first();
-        $issue = $prediction->prediction;
-
+        // Call the Python service to get recommendations
         $client = new Client();
         $response = $client->post('http://127.0.0.1:8000/recommend/', [
             'json' => [
-                'skin_type' => $skin_type,
-                'issue' => $issue
+                'answers' => $answers,
+                'issue' => $prediction,
             ]
         ]);
 
-        $recommendations = json_decode($response->getBody()->getContents(), true);
-        return response()->json($recommendations);
+        // Decode the JSON response
+        $data = json_decode($response->getBody()->getContents(), true);
+        return response()->json($data['recommendations']);
     }
 
 
