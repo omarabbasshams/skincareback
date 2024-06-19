@@ -82,25 +82,28 @@ class UserController extends Controller
         $data = json_decode($response->getBody()->getContents(), true);
         return $data['prediction'];
     }
-
     public function getRecommendations(Request $request)
     {
         $user = Auth::user();
-        $answers = Answer::where('user_id', $user->id)->pluck('answer', 'question_id')->toArray();
-        $prediction = Prediction::where('user_id', $user->id)->latest()->first();
 
-        if (!$prediction) {
-            return response()->json(['error' => 'No prediction found'], 400);
-        }
+        $answers = Answer::where('user_id', $user->id)->get();
+        $skin_type = $answers->where('question_id', 1)->first()->answer; // Assuming question_id 1 is for skin type
 
-        // Call the recommendation service
-        $recommendations = $this->callRecommendationService($answers, $prediction->prediction_result);
+        $prediction = Prediction::where('user_id', $user->id)->orderBy('created_at', 'desc')->first();
+        $issue = $prediction->prediction;
 
-        // Get the product details from the Product table
-        $products = Product::whereIn('id', $recommendations)->get();
+        $client = new Client();
+        $response = $client->post('http://127.0.0.1:8000/recommend/', [
+            'json' => [
+                'skin_type' => $skin_type,
+                'issue' => $issue
+            ]
+        ]);
 
-        return response()->json(['recommendations' => $products]);
+        $recommendations = json_decode($response->getBody()->getContents(), true);
+        return response()->json($recommendations);
     }
+
 
     protected function callRecommendationService($answers, $predictionResult)
     {
