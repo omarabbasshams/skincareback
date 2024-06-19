@@ -96,8 +96,15 @@ class UserController extends Controller
             return response()->json(['error' => 'No prediction found'], 400);
         }
 
+        // Assuming the first question is related to skin_type
+        $skin_type = isset($answers[1]) ? $answers[1] : null;
+
+        if (!$skin_type) {
+            return response()->json(['error' => 'Skin type not provided in answers'], 400);
+        }
+
         $response = Http::post('http://127.0.0.1:8000/recommend/', [
-            'answers' => $answers,
+            'skin_type' => $skin_type,
             'issue' => $prediction->prediction_result
         ]);
 
