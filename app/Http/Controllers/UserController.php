@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Storage;
 use App\Models\Question;
 use App\Models\Answer;
 use App\Models\Prediction;
+use App\Models\Product;
 use App\Models\Recommendation;
 
 class UserController extends Controller
@@ -86,38 +87,49 @@ class UserController extends Controller
         return $data['prediction'];
     }
 
-    public function getRecommendations()
-    {
-        $user = Auth::user();
-        $prediction = Prediction::where('user_id', $user->id)->latest()->first();
-        $answers = Answer::where('user_id', $user->id)->get()->pluck('answer', 'question_id')->toArray();
+   public function getRecommendations()
+{
+    $user = Auth::user();
+    $prediction = Prediction::where('user_id', $user->id)->latest()->first();
+    $answers = Answer::where('user_id', $user->id)->get()->pluck('answer', 'question_id')->toArray();
 
-        if (!$prediction) {
-            return response()->json(['error' => 'No prediction found'], 400);
-        }
+    if (!$prediction) {
+        return response()->json(['error' => 'No prediction found'], 400);
+    }
 
-        // Assuming the first question is related to skin_type
-        $skin_type = isset($answers[1]) ? $answers[1] : null;
+    // Assuming the first question is related to skin_type
+    $skin_type = isset($answers[1]) ? $answers[1] : null;
 
-        if (!$skin_type) {
-            return response()->json(['error' => 'Skin type not provided in answers'], 400);
-        }
+    if (!$skin_type) {
+        return response()->json(['error' => 'Skin type not provided in answers'], 400);
+    }
 
-        $response = Http::post('http://127.0.0.1:8000/recommend/', [
-            'skin_type' => $skin_type,
-            'issue' => $prediction->prediction_result
-        ]);
+    $response = Http::post('http://127.0.0.1:8000/recommend/', [
+        'skin_type' => $skin_type,
+        'issue' => $prediction->prediction_result
+    ]);
 
-        $data = $response->json();
+    $data = $response->json();
+
+    if (isset($data['recommendations']) && is_array($data['recommendations'])) {
+        // Fetch product details
+        $productDetails = Product::whereIn('id', $data['recommendations'])->get();
 
         // Save recommendations in the database
-        foreach ($data['recommendations'] as $product_id) {
+        foreach ($productDetails as $product) {
             Recommendation::create([
                 'user_id' => $user->id,
-                'product_id' => $product_id,
+                'product_id' => $product->id,
             ]);
         }
 
-        return response()->json($data);
+        // Return the product details in the response
+        return response()->json([
+            'recommendations' => $productDetails
+        ]);
+    } else {
+        return response()->json(['error' => 'No recommendations found'], 404);
     }
+}
+
 }
