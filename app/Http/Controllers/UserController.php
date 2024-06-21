@@ -114,7 +114,10 @@ class UserController extends Controller
     if (isset($data['recommendations']) && is_array($data['recommendations'])) {
         // Fetch product details
         $productDetails = Product::whereIn('id', $data['recommendations'])->get();
-
+        $productDetails = $productDetails->map(function ($product) {
+            $product->image_path = $product->image_path ? url(Storage::url($product->image_path)) : null;
+            return $product;
+        });
         // Save recommendations in the database
         foreach ($productDetails as $product) {
             Recommendation::create([
