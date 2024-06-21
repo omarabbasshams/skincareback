@@ -11,6 +11,7 @@
         <h1>Admin Dashboard</h1>
         <nav>
             <a href="{{ route('questions.index') }}" class="btn btn-primary">Manage Questions</a>
+            <a href="{{ route('admin.products.index') }}" class="btn btn-primary">Manage Products</a> <!-- New button for product index page -->
             <form method="POST" action="{{ route('admin.logout') }}" style="display:inline;">
                 @csrf
                 <button type="submit" class="btn btn-danger">Logout</button>
@@ -23,3 +24,4 @@
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 </body>
 </html>
+
