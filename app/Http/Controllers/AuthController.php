@@ -39,7 +39,15 @@ class AuthController extends Controller
         if (Auth::attempt($credentials)) {
             $user = Auth::user();
             $token = $user->createToken('LaravelPassportAuth')->accessToken;
-            return response()->json(['token' => $token], 200);
+            return response()->json([
+                'token' => $token,
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    // Add any other user details you want to include
+                ]
+            ], 200);
         } else {
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
