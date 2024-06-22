@@ -120,7 +120,7 @@ class UserController extends Controller
 
             // Transform product details to include the full URL of the image path
             $productDetails = $productDetails->map(function ($product) {
-                $product->image_url = $product->image_path ? url(Storage::url($product->image_path)) : null;
+                $product->image_path = $product->image_path ? url(Storage::url($product->image_path)) : null;
                 return $product;
             });
 
