@@ -124,8 +124,13 @@ class UserController extends Controller
                 return $product;
             });
 
+            // Filter products by label and select the highest rank
+            $filteredProducts = $productDetails->groupBy('label')->map(function ($group) {
+                return $group->sortByDesc('rank')->first();
+            })->values();
+
             // Save recommendations in the database
-            foreach ($productDetails as $product) {
+            foreach ($filteredProducts as $product) {
                 Recommendation::create([
                     'user_id' => $user->id,
                     'product_id' => $product->id,
@@ -134,12 +139,13 @@ class UserController extends Controller
 
             // Return the product details in the response
             return response()->json([
-                'recommendations' => $productDetails
+                'recommendations' => $filteredProducts
             ]);
         } else {
             return response()->json(['error' => 'No recommendations found'], 404);
         }
     }
+
 
 
 }
